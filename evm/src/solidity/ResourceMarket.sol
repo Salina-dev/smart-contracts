@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity >=0.8.0;
 
+interface IERC20 {
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
 /// There are three resources needed to survive: Water, Food, and Wood.
 enum Resource {
     Water,
@@ -52,3 +57,51 @@ abstract contract ResourceMarket {
 // there are no such risks. And depositing funds into the market comes with an opportunity cost.
 // Design a reward system where there is a small fee on every withdrawal, and that fee is paid to
 // liquidity providers.
+
+
+
+contract ResourceMarketLogic is ResourceMarket {
+    mapping(address => mapping(Resource => uint)) public balance;
+
+    // ERC20 tokens addresses
+    address[] public tokens;
+
+    // Fee percentage on withdrawals
+    uint public withdrawalFeePercentage = 1; // 1% fee
+
+    event Contribution(address indexed account, uint amount, Resource resource);
+    event Withdrawal(address indexed account, uint amount, Resource resource);
+
+    // Constructor to initialize ERC20 token addresses
+    constructor(address[] memory _tokens) {
+        require(_tokens.length == 3, "Invalid number of tokens");
+        tokens = _tokens;
+    }
+
+    /// Contribute some of your own private resources to the market.
+    /// Contributions are made one asset at a time.
+
+    function contribute(uint amount, Resource resource) public override {
+    require(amount > 0, "Invalid amount");
+    address tokenAddress = tokens[uint(resource)];
+    require(IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount), "Transfer failed");
+    balance[msg.sender][resource] += amount;
+    emit Contribution(msg.sender, amount, resource);
+}
+
+    /// Withdraw some resources from the market into your own private reserves.
+    function withdraw(uint amount, Resource resource) public override {
+        require(balance[msg.sender][resource] >= amount, "Insufficient balance");
+        uint fee = (amount * withdrawalFeePercentage) / 100;
+        uint netAmount = amount - fee;
+        require(IERC20(tokens[uint(resource)]).transfer(msg.sender, netAmount), "Transfer failed");
+        balance[msg.sender][resource] -= amount;
+        emit Withdrawal(msg.sender, netAmount, resource);
+    }
+
+    /// Set the withdrawal fee percentage
+    function setWithdrawalFeePercentage(uint _percentage) external {
+        require(_percentage <= 100, "Invalid fee percentage");
+        withdrawalFeePercentage = _percentage;
+    }
+}
