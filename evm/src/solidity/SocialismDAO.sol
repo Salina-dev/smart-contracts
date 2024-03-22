@@ -72,28 +72,64 @@ contract SocialismDAO {
 
     /// Join as a new member of the society
     function join() external {
-        //TODO
+        // Make sure the caller is not already a member
+        require(!members[msg.sender], "Already a member");
+
+        // Add the caller to the members mapping
+        members[msg.sender] = true;
+
+        // Increment the number of members
+        num_members++;
+
+        // Emit an event to indicate that a new member has joined
+        emit MemberJoined(msg.sender);
     }
 
     /// Exit the society.
     function exit() external {
-        //TODO
+        // Make sure the caller is a member
+        require(members[msg.sender], "Not a member");
+
+        // Remove the caller from the members mapping
+        delete members[msg.sender];
+
+        // Decrement the number of members
+        num_members--;
+
+        // Emit an event to indicate that a member has exited
+        emit MemberExited(msg.sender);
     }
+
 
     /// Helper function to remove a member's needs
     /// This helper is useful because removal involves three storage items
     function remove_need(address a) internal {
-        //TODO
+        // Find the index of the member in the array of members with needs
+        uint indexToRemove = needy_member_index[a];
+
+        // Swap the member to remove with the last member in the array
+        address lastMember = members_with_needs[members_with_needs.length - 1];
+        members_with_needs[indexToRemove] = lastMember;
+        needy_member_index[lastMember] = indexToRemove;
+
+        // Remove the last element from the array
+        members_with_needs.pop();
+
+        // Remove the member's need from the needs mapping
+        delete needs[a];
+
+        // Remove the member's index from the needy_member_index mapping
+        delete needy_member_index[a];
     }
 
     /// Check whether an account is a member of the DAO
     function is_member(address x) external view returns(bool) {
-        //TODO
+        return members[x];
     }
 
     /// Check the currently registered need of the given user.
     function user_need(address x) external view returns(uint256) {
-        //TODO
+        return needs[x];
     }
 
     /// Claim the amount of tokens you need on a roughly 100 block basis.
@@ -104,7 +140,21 @@ contract SocialismDAO {
     ///
     /// In times of plenty your needs will be met; in times of scarcity they may not be.
     function claim_need(uint need) external {
-        //TODO
+        // Update the caller's need in the `needs` mapping
+        needs[msg.sender] = need;
+
+        // If the caller has previously claimed a need, update the members_with_needs array
+        if (needy_member_index[msg.sender] != 0 || members_with_needs.length == 0) {
+            if (needs[msg.sender] == 0) {
+                remove_need(msg.sender);
+            } else if (needy_member_index[msg.sender] == 0) {
+                members_with_needs.push(msg.sender);
+                needy_member_index[msg.sender] = members_with_needs.length;
+            }
+        }
+
+        // Emit an event indicating that a need has been claimed
+        emit NeedClaimed(msg.sender, need);
     }
 
     /// Contribute some of your private funds to the socialism.
@@ -112,7 +162,7 @@ contract SocialismDAO {
     ///
     /// Although we expect only members to contribute, we will allow donations from non-members too
     function contribute() external payable {
-        //TODO
+        emit ResourcesContributed(msg.sender, msg.value);
     }
 
     /// Cause the members to be paid according to their needs.
@@ -134,8 +184,40 @@ contract SocialismDAO {
     /// People who know their typical weekly expense will not have to re-submit each time.
     /// This helps save gas fees, but makes it easier to ignore your civic duty to decrease your claim when you need less.
     function trigger_payouts() external {
-        //TODO
+        // Check if the payout period has elapsed
+        require(block.number >= last_payout_block + 100, "Payout period has not elapsed yet");
+
+        // Update the last payout block
+        last_payout_block = block.number;
+
+        // Calculate the total amount available for payout
+        uint total_available_funds = address(this).balance;
+
+        // Loop through the members and pay them according to their needs
+        for (uint i = 0; i < members_with_needs.length; i++) {
+            address member = members_with_needs[i];
+            uint member_need = needs[member];
+
+            // Calculate the even split amount based on the remaining funds
+            uint even_split_amount = total_available_funds / (members_with_needs.length - i);
+
+            // Determine the actual payout amount for this member
+            uint payout_amount = (even_split_amount < member_need) ? even_split_amount : member_need;
+
+            // Transfer the funds to the member
+            payable(member).transfer(payout_amount);
+
+            // Subtract the paid amount from the total available funds
+            total_available_funds -= payout_amount;
+
+            // Remove the member's need since it has been satisfied
+            remove_need(member);
+        }
+
+        // Emit an event indicating that payouts have been performed
+        emit PayoutsPerformed(block.number, address(this).balance, total_available_funds);
     }
+
         
 }
 
