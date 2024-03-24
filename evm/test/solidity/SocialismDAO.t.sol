@@ -48,15 +48,25 @@ contract SocialismInitializationTests is Test {
     }
 
     function test_non_member_can_contribute() public {
-        //todo
+        vm.expectEmit();
+        emit ResourcesContributed(address(0), 100 ether);
+        hoax(address(0), 100 ether);
+        dao.contribute{value: 100 ether}();
+        assertEq(address(dao).balance, 100 ether);
     }
 
     function test_member_can_exit() public {
-        //todo
+         vm.expectEmit();
+        emit MemberExited(address(0));
+        vm.prank(address(0));
+        dao.exit();
+        assert(!dao.is_member(address(0)));
     }
 
     function test_non_member_cannot_exit() public {
-        //todo
+        vm.prank(address(0));
+        vm.expectRevert();
+        dao.exit();
     }
 
     function test_fallback_function_is_disabled() public {
@@ -96,6 +106,21 @@ contract SocialismClaimsAndPayoutsTest is Test {
     }
 
     //TODO lots more cases
+
+    function test_member_can_claim_multiple_times() public {
+        vm.expectEmit();
+        emit NeedClaimed(alice, 10);
+        vm.prank(alice);
+        dao.claim_need(10);
+        emit NeedClaimed(alice, 15);
+        dao.claim_need(15);
+        assertEq(dao.user_need(alice), 15);
+    }
+
+    function test_payouts_not_triggered_before_min_blocks() public {
+        vm.expectRevert();
+        dao.trigger_payouts();
+    }
 }
 
 //TODO maybe also some tests for the quicksort function just to be sure it actually works.
