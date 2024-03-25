@@ -64,7 +64,18 @@ contract TicTacToe {
     /// Internal helper function to actually do the turn taking logic
     /// This is called by both take_turn and take_winning_turn
     function do_take_turn(uint cell_index) internal {
-        //TODO
+        require(cell_index >= 0 && cell_index < 9, "Invalid cell index");
+        require(board[cell_index] == address(0), "Cell already taken");
+        
+        address player = msg.sender;
+        require(player == player1 || player == player2, "Wrong player");
+        
+        require(player == (num_turns % 2 == 0 ? player1 : player2), "Wrong player's turn");
+        
+        board[cell_index] = player;
+        num_turns++;
+        
+        emit TurnTaken(player, cell_index);
     }
 
     /// @dev Take a winning turn in a tic-tac-toe game
@@ -74,17 +85,51 @@ contract TicTacToe {
     /// rather the user is forced to point out exactly where they have won, and the chain
     /// just confirms it.
     function take_winning_turn(uint cell_index, WinLocation win_location) external {
-        //TODO
+        do_take_turn(cell_index);
+    
+        address winner = msg.sender;
+        require(verify_win(winner, win_location), "Invalid win claimed");
+        
+        emit GameWon(winner, win_location);
     }
 
     /// Internal helper function to verify whether a win is valid.
     function verify_win(address winner, WinLocation location) view internal returns(bool) {
-        //TODO
+        address player = winner;
+        address opponent = (player == player1) ? player2 : player1;
+        
+        // Check if the claimed win location is valid
+        if (location == WinLocation.LeftColumn) {
+            return (board[0] == player && board[3] == player && board[6] == player);
+        } else if (location == WinLocation.CenterColumn) {
+            return (board[1] == player && board[4] == player && board[7] == player);
+        } else if (location == WinLocation.RightColumn) {
+            return (board[2] == player && board[5] == player && board[8] == player);
+        } else if (location == WinLocation.TopRow) {
+            return (board[0] == player && board[1] == player && board[2] == player);
+        } else if (location == WinLocation.MiddleRow) {
+            return (board[3] == player && board[4] == player && board[5] == player);
+        } else if (location == WinLocation.BottomRow) {
+            return (board[6] == player && board[7] == player && board[8] == player);
+        } else if (location == WinLocation.UphillDiagonal) {
+            return (board[0] == player && board[4] == player && board[8] == player);
+        } else if (location == WinLocation.DownhillDiagonal) {
+            return (board[2] == player && board[4] == player && board[6] == player);
+        } else {
+            return false;
+        }
     }
 
     /// Give up on the game allowing the other player to win.
     function surrender() external {
-        //TODO
+        address player = msg.sender;
+        require(player == player1 || player == player2, "Invalid player");
+
+        // Determine the opponent of the player who surrenders
+        address opponent = (player == player1) ? player2 : player1;
+
+        // Emit the event indicating the surrender
+        emit GameWon(opponent, WinLocation.OpponentSurrender);
     }
 }
 
