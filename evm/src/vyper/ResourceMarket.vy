@@ -27,20 +27,53 @@ wood: uint256
 credit: HashMap[address, uint256]
 
 @external
+def __init__():
+    self.resource_balance[Resource.WATER] = 0
+    self.resource_balance[Resource.WOOD] = 0
+    self.resource_balance[Resource.FOOD] = 0
+
+@external
 def contribute(amount: uint256, resource: Resource):
     """ Contribute some of your own private resources to the market.
 
     Contributions are made one asset at a time.
     """
 
-    #TODO
+    """
+    Contribute some of your own private resources to the market.
+    Contributions are made one asset at a time.
+    """
+    # Only accept positive contributions
+    require(amount > 0, "Contribution amount must be positive")
+    
+    # Increase the balance of the specified resource
+    self.resource_balance[resource] += amount
+    
+    # Update contributor's credit
+    self.credit[msg.sender] += amount
     pass
 
 @external
 def withdraw(amount: uint256, resource: Resource):
     """ Withdraw some resources from the market into your own private reserves. """
 
-    #TODO
+    """ 
+    Withdraw some resources from the market into your own private reserves. 
+    """
+    # Check if the caller has enough credit
+    require(self.credit[msg.sender] >= amount, "Insufficient credit")
+
+    # Check if the market has enough resources
+    require(self.resource_balance[resource] >= amount, "Insufficient resource balance")
+
+    # Decrease the balance of the specified resource
+    self.resource_balance[resource] -= amount
+    
+    # Decrease contributor's credit
+    self.credit[msg.sender] -= amount
+
+    # Transfer the withdrawn resources to the caller
+    send(msg.sender, amount)
     pass
 
 
